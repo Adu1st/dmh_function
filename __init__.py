@@ -32,12 +32,22 @@ def reverse_seq(seq, rna=False):
         rev_nuc = str.maketrans('ATGCatgc', 'TACGtacg')
     return seq[::-1].translate(rev_nuc)
 
+def calc_GC(seq):
+    """
+    Calculate GC content of input seq.
+    """
+    valid_sequence(seq)
+    seq_stat = Counter(seq.upper())
+    GC = (seq_stat['G'] + seq_stat['C']) / len(seq)
+    return GC
+
 def ePCR(target_seq, primer5, primer3):
     """
     Test the PCR product by input target_seq, primer5 and primer3.
     Return a tuple, first element is boolen whether there exists products by giving primer pair, second element is the length of product (0 while not exist).
     Raise ValueError when multiple location found in target_seq.
     """
+    valid_sequence(target_seq)
     ix = False
     pcr_len = 0
     for seq in (target_seq, reverse_seq(target_seq)):
@@ -155,3 +165,17 @@ def read_gtf_file(gtf_file, selected_type=('CDS', 'exon')):
     gtf_iter = generate_gtf_selected_stream(gtf_file, selected_type=selected_type)
     anno_db = [parse_gtf_cnts(x) for x in gtf_iter]
     return pd.DataFrame(anno_db, columns=['seq_name', 'seq_strand', 'seq_start', 'seq_end', 'seq_type', 'gene_id', 'transcript_id'])
+
+def calc_assembly_NL(seq_len_list, quantile=50):
+    """
+    Calculate N50 or L90 to evaluate quanlity of genome assembly.
+    Input seq_len_list is a list or generator of length of all sequences.
+    Input quantile 50 for L50 and N50, 90 for L90 and N90.
+    Return a tuple with first element L-quantile and second element N-quantile.
+    """
+    len_list = sorted(seq_len_list, reverse=True)
+    genome_size = sum(len_list)
+    cutoff = genome_size*(quantile/100)
+    for i, accu_len in enumerate(accumulate(len_list)):
+        if len_acc >= cutoff:
+            return i, len_list[i]
