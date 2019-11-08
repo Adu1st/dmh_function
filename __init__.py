@@ -1,4 +1,3 @@
-#!/usr/local/python3.6/bin/python3
 from re import search, findall
 from itertools import groupby, accumulate
 from collections import Counter
