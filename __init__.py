@@ -178,3 +178,25 @@ def calc_assembly_NL(seq_len_list, quantile=50):
     for i, accu_len in enumerate(accumulate(len_list)):
         if len_acc >= cutoff:
             return i, len_list[i]
+
+def get_sequence(seq_id, anno_db, genome, seq_type='CDS', exon_split=''):
+    def get_sequence_from_genome_by_anno_db(df, genome):
+        tmp_seq = genome[df['seq_name']]
+        tmp_seq_start = df['seq_start']-1
+        tmp_seq_end = df['seq_end']
+        df['seq'] = tmp_seq[tmp_seq_start:tmp_seq_end]
+        return df
+    gene_db = anno_db.query(f'seq_type == {seq_type} and transcript_id == {seq_id}')
+    gene_db = gene_db.sort_values(by='seq_start')
+    gene_db = gene_db.apply(get_sequence_from_genome_by_anno_db, axis=1, genome=genome)
+    if isinstance(exon_split, str):
+        cds_seq = exon_split.join(gene_db['seq'])
+    else:
+        raise TypeError('Input exon_split should be a string but %s' % type(exon_split))
+    if np.all(gene_db['seq_strand'] == '-'):
+        cds_seq = reverse_seq(cds_seq)
+    elif np.all(gene_db['seq_strand'] == '+'):
+        pass
+    else:
+        raise ValueError('Different strand in the elements of %s' % seq_id)
+    return cds_seq
