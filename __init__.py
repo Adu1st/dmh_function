@@ -182,13 +182,16 @@ def calc_assembly_NL(seq_len_list, quantile=50):
             return i, len_list[i]
 
 def get_sequence(seq_id, anno_db, genome, seq_type='CDS', exon_split=''):
+    """
+    Get sequence of gene by seq_id. The anno_db and genome is required. Default seq_type is CDS. Output sequence can be splited at junction loci by exon_split.
+    """
     def get_sequence_from_genome_by_anno_db(df, genome):
         tmp_seq = genome[df['seq_name']]
         tmp_seq_start = df['seq_start']-1
         tmp_seq_end = df['seq_end']
         df['seq'] = tmp_seq[tmp_seq_start:tmp_seq_end]
         return df
-    gene_db = anno_db.query(f'seq_type == {seq_type} and transcript_id == {seq_id}')
+    gene_db = anno_db.query(f'seq_type == "{seq_type}" and transcript_id == "{seq_id}"')
     gene_db = gene_db.sort_values(by='seq_start')
     gene_db = gene_db.apply(get_sequence_from_genome_by_anno_db, axis=1, genome=genome)
     if isinstance(exon_split, str):
