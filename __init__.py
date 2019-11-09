@@ -45,12 +45,12 @@ def calc_GC(seq):
 def ePCR(target_seq, primer5, primer3):
     """
     Test the PCR product by input target_seq, primer5 and primer3.
-    Return a tuple, first element is boolen whether there exists products by giving primer pair, second element is the length of product (0 while not exist).
+    Return a tuple, first element is boolen whether there exists products by giving primer pair, second element is the sequence of product (empty while not exist).
     Raise ValueError when multiple location found in target_seq.
     """
     valid_sequence(target_seq)
     ix = False
-    pcr_len = 0
+    pcr_seq = ''
     for seq in (target_seq, reverse_seq(target_seq)):
         cnt5, cnt3 = seq.count(primer5), seq.count(primer3)
         if cnt5 > 1 or cnt3 > 1:
@@ -59,9 +59,9 @@ def ePCR(target_seq, primer5, primer3):
         pos3 = reverse_seq(seq).find(primer3)
         pos3 = len(seq) - pos3 - 1 if pos3 != -1 else -1
         if pos3 >= pos5 != -1:
-            pcr_len = pos3-pos5+1
+            pcr_seq = seq[pos5:(pos3+1)]
             ix = True
-    return ix, pcr_len
+    return ix, pcr_seq
 
 def translate(cds):
     """
@@ -181,7 +181,7 @@ def calc_assembly_NL(seq_len_list, quantile=50):
         if len_acc >= cutoff:
             return i, len_list[i]
 
-def get_sequence(seq_id, anno_db, genome, seq_type='CDS', exon_split=''):
+def get_sequence(seq_id, anno_db, genome, seq_type='CDS', exon_split='', flank_len=0):
     """
     Get sequence of gene by seq_id. The anno_db and genome is required. Default seq_type is CDS. Output sequence can be splited at junction loci by exon_split.
     """
@@ -194,10 +194,27 @@ def get_sequence(seq_id, anno_db, genome, seq_type='CDS', exon_split=''):
     gene_db = anno_db.query(f'seq_type == "{seq_type}" and transcript_id == "{seq_id}"')
     gene_db = gene_db.sort_values(by='seq_start')
     gene_db = gene_db.apply(get_sequence_from_genome_by_anno_db, axis=1, genome=genome)
+    seq_name = gene_db['seq_name'].unique()
+    seq_strand = gene_db['seq_strand'].unique()
+    if len(seq_name) > 1 or len(seq_strand) > 1:
+        raise TypeError('Different seq_name or seq_strand for the same gene!')
+    else:
+        seq_name = seq_name[0]
+        seq_strand = seq_strand[0]
     if isinstance(exon_split, str):
         cds_seq = exon_split.join(gene_db['seq'])
     else:
         raise TypeError('Input exon_split should be a string but %s' % type(exon_split))
+    if flank_len:
+        gene_start = gene_db.iloc[0]['seq_start']
+        gene_end = gene_db.iloc[-1]['seq_end']
+        tmp_seq = genome[seq_name]
+        flank5 = tmp_seq[(gene_start-flank_len-1):(gene_start-1)].lower()
+        flank3 = tmp_seq[gene_end:(gene_end+flank_len)].lower()
+    else:
+        flank5 = ''
+        flank3 = ''
+    cds_seq = flank5 + cds_seq + flank3
     if np.all(gene_db['seq_strand'] == '-'):
         cds_seq = reverse_seq(cds_seq)
     elif np.all(gene_db['seq_strand'] == '+'):
